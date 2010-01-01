@@ -8,7 +8,6 @@
 
 #include "moc/moc_systrayicon.cpp"
 
-
 SystrayIcon::SystrayIcon(QObject * parent) : QSystemTrayIcon (parent)
 {
 	// Get Settings from config file
@@ -20,14 +19,7 @@ SystrayIcon::SystrayIcon(QObject * parent) : QSystemTrayIcon (parent)
 	settings.endGroup();
 
 	if (!QFile::exists(SettingsInfo::configDir()))
-	{        
 		saveSettings();
-		if (!QFile::exists(SettingsInfo::configDir()))
-		{
-			qDebug("could not write conf file");
-			exit( -1 );
-		}
-	}    
 
 	history_file_name = QString("%1/%2").arg(SettingsInfo::configDir()).arg("history.log");
 
@@ -35,32 +27,20 @@ SystrayIcon::SystrayIcon(QObject * parent) : QSystemTrayIcon (parent)
 	connect(quitAction, SIGNAL(triggered()), qApp, SLOT(quit()));
 
 	configureAction = new QAction( QIcon(":images/configure.png"), tr("&Configure"), this);
-	connect(configureAction, SIGNAL(triggered()), this, SLOT(showTextEditDialog()));
+	connect(configureAction, SIGNAL(triggered()), this, SLOT(showConfigDialog()));
 
 	aboutAction = new QAction( QIcon(":images/info.png"), tr("&About"), this);
 	connect(aboutAction, SIGNAL(triggered()), this, SLOT(showAbout()));
 
-	// Restore clipboard history frome file
+	// Restore clipboard history from file
 	QFile file(history_file_name); //QFile file("history.log");
-	if (file.open(QIODevice::ReadOnly | QIODevice::Text))
-	{
-		QTextStream in(&file);
-		QString buffer = in.readAll();
-		QStringList strlst = buffer.split("--SEPARATOR--");
-
-		for (int i = 0; i < strlst.size(); ++i)
-		{
-			//qDebug() << qPrintable(strlst.at(i).simplified()) ;
-			queue.enqueue(strlst.at(i));
-		}
-
-		file.close();
-	}
+	file.open(QIODevice::ReadOnly);
+	QDataStream in(&file);    // read the data serialized from the file
+	in >> strLst;
 
 	setIcon(QIcon(":images/klipper_dock.png"));
 	setToolTip(tr("Qlipper - a clipboard history without KDE"));
 	constructSystrayMenu();
-	//setContextMenu(trayIconMenu);
 
 	QClipboard *clipboard = QApplication::clipboard();
 
@@ -70,50 +50,29 @@ SystrayIcon::SystrayIcon(QObject * parent) : QSystemTrayIcon (parent)
 
 void SystrayIcon::constructSystrayMenu()
 {
-	//qDebug("initSystrayMenu");
-
 	// Add new clipboard entry in menu list
 	QClipboard *clipboard = QApplication::clipboard();
 	if (!clipboard->text().isEmpty())
 	{
-		queue.enqueue(clipboard->text());
+		strLst << clipboard->text();
 
-		// check for duplicates
-		for (int i = 0; i < queue.size()-1; ++i)
-		{
-			if (clipboard->text() == queue.at(i))
-			{
-				queue.removeAt(i); //qDebug("removed !");
-				//break;
-			}
-		}
+		strLst.removeDuplicates();
 	}
 
 	// check maximum entries limit
-	if (queue.size()>history_max_size)
-		queue.dequeue();
+	if (strLst.size() > history_max_size)
+		strLst.pop_front();
 
-	// format display for entry
-	QString clipText = "";
-	/*
-	QString clipText = clipboard->text().simplified();
-	if ( clipText.size() > 60 )
-	clipText = clipText.left(60) + " ...";
-	*/
-
-	trayIconMenu = new QMenu(/*this*/);
-	//stuffAction = new QAction(  clipText, this);
-	//connect(stuffAction, SIGNAL(triggered()), qApp, SLOT(quit()));
-	//trayIconMenu->addAction(stuffAction);
-	//trayIconMenu->addSeparator();
+	trayIconMenu = new QMenu();
 
 	QSignalMapper *signalMapper = new QSignalMapper(this);
 	connect(signalMapper, SIGNAL(mapped(int)), this, SLOT(clipTextClicked(int)));
-	for (int j = 0; j < queue.size(); ++j)
+	for (int j = 0; j < strLst.size(); ++j)
 	{
-		clipText = getDisplayText( queue.at( queue.size()-j-1) ); // clipText = queue.at(j) + "kk";
+		// format display for entry
+		QString clipText = getDisplayText( strLst.at( strLst.size() - j - 1) ); // clipText = queue.at(j) + "kk";
 		QAction * actionT = new QAction( clipText, this );
-		signalMapper->setMapping(actionT, queue.size()-j-1); // signalMapper->setMapping(actionT, j);
+		signalMapper->setMapping(actionT, strLst.size() - j - 1); // signalMapper->setMapping(actionT, j);
 		connect( actionT, SIGNAL( triggered() ), signalMapper, SLOT( map() ) );
 		trayIconMenu->addAction(actionT);
 	}
@@ -160,25 +119,15 @@ void SystrayIcon::clipTextClicked(int idx)
 {
 	qDebug() << "clipTextClicked " << qPrintable(QString::number(idx));
 	QClipboard *clipboard = QApplication::clipboard();
-	clipboard->setText(queue.at(idx));
+	clipboard->setText(strLst.at(idx));
 }
 
 void SystrayIcon::showAbout()
 {
-	QMessageBox::information(0, tr("Qlipper"), tr("Clipboard history without KDE.\n\n(c) 2010-2011 thierry deseez"));
-	return;
-
-	QMessageBox msgBox;
-	msgBox.setText("The document has been modified.");
-	msgBox.setInformativeText("Do you want to save your changes?");
-	msgBox.setStandardButtons(QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
-	msgBox.setDefaultButton(QMessageBox::Save);
-	int ret = msgBox.exec();
-	if (ret==QMessageBox::Save)
-		qDebug("Must Save message");
+	QMessageBox::information(0, tr("Qlipper"), tr("Clipboard history without KDE.\n\n(c) 2010-2011 Coolcute"));
 }
 
-void SystrayIcon::showTextEditDialog()
+void SystrayIcon::showConfigDialog()
 {
 	PrefsDialog *dlg = new PrefsDialog();
 	dlg->setAttribute (Qt::WA_DeleteOnClose);
@@ -204,21 +153,8 @@ void SystrayIcon::saveSettings()
 
 SystrayIcon::~SystrayIcon()
 {
-	qDebug() << "Bye";
-	if (clipboard_history_save == true)
-	{
-		QFile logfile (history_file_name);
-		QTextStream ts( &logfile );
-		if (logfile.open(QFile::WriteOnly | QFile::Text))
-		{
-			for (int i = 0; i < queue.size(); ++i)
-			{
-				if (i == queue.size()-1)
-					ts << queue.at(i);
-				else
-					ts << queue.at(i) << "--SEPARATOR--";
-			}
-			logfile.close();
-		}
-	}
+	QFile file(history_file_name);
+	file.open(QIODevice::WriteOnly);
+	QDataStream out(&file);   // we will serialize the data into the file
+	out << strLst; 
 }

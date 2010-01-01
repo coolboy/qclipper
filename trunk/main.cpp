@@ -6,16 +6,16 @@
 
 int main(int argc, char *argv[])
 {
-    QApplication a(argc, argv);
-    a.setApplicationName("qlipper");
-    a.setApplicationVersion("1.2");
-    a.setOrganizationDomain("qlipper.org");
-    a.setOrganizationName("Qlipper");
+    QApplication app(argc, argv);
+    app.setApplicationName("qlipper");
+    app.setApplicationVersion("1.2");
+    app.setOrganizationDomain("qlipper.org");
+    app.setOrganizationName("Qlipper");
 
 		QSettings::setDefaultFormat(QSettings::IniFormat);
 
-    SystrayIcon w;
-    w.show();
-    a.setQuitOnLastWindowClosed(false);
-    return a.exec();
+    SystrayIcon mwin;
+    mwin.show();
+    app.setQuitOnLastWindowClosed(false);
+    return app.exec();
 }

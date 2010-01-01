@@ -1,16 +1,26 @@
-#ifndef SYSTRAYICON_H
-#define SYSTRAYICON_H
-
+/*
+ * Copyright (c) 2010, Sysu
+ * 保留所有权利。( All rights reserved. )
+ * 
+ * 文件名称：systrayicon.hxx
+ * 文件标识：
+ * 摘    要：
+ * 
+ * 当前版本：1.0
+ * 作    者：Coolboy
+ * 完成日期：2010年1月1日
+ *
+ * 取代版本：
+ * 原作者  ：
+ * 完成日期：
+ */
+#pragma once
 #include <QSystemTrayIcon>
 #include <QQueue>
-//#include <QMap>
-//#include <QClipboard>
 
 class QAction;
 class QSystemTrayIcon;
 
-
-//class SystrayIcon : public QMainWindow
 class SystrayIcon : public QSystemTrayIcon
 {
     Q_OBJECT
@@ -24,24 +34,20 @@ private slots:
     void clipTextClicked(int);
     void systrayClicked(QSystemTrayIcon::ActivationReason);
     void showAbout();
-    void showTextEditDialog();
+    void showConfigDialog();
 
 private:
     QString getDisplayText(QString);
     void saveSettings();
 
-    QQueue<QString> queue;// QMap <int, QStringList> messages_map;
+    QStringList strLst;
     QMenu *trayIconMenu;
     QAction *quitAction;
     QAction *configureAction;
     QAction *aboutAction;
-
-    //QDialog *textEditDlg;
 
     QString history_file_name;
     int history_max_size;
     int entry_display_max_size;
     bool clipboard_history_save;
 };
-
-#endif // SYSTRAYICON_H
